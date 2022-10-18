@@ -1,23 +1,40 @@
 import datetime
-from typing import Optional
 
-import requests
+from dateutil.parser import parser
 
-base_url = 'https://early-unfortunate-mail.anvil.app/_/api/'
+import srv
+import auth
+from gooey import Gooey, GooeyParser
 
 
+# A local app of fitness that runs on the editor
+@Gooey(program_name='Fitness.Me Converter', show_sucess_modal=False)
 def main():
+    parser = GooeyParser(discription='Fitness.Me App edition v1.0' + '/n+' + 'Record your measurements')
+    auth.load_auth()
+    if not auth.is_authorise():
+        parser.add_argument('Email', default=auth.email)
+        parser.add_argument('Password', widget="PasswordFeild")
+    parser.add_argument('Weight', help='Weight in pounds', type=int)
+    parser.add_argument('Rate', help='Resting heart rate', type=int)
+    parser.add_argument('Date', help='Date of measurement', widget='DateChooser', default=datetime.datetime)
+    parser.parse_args()
+        auth_data = get_auth_data()
+        email = auth_data.get('email')
+        password = auth_data.get('password')
+        api_key = srv.authenticate(email, password)
+        auth.save_authorise(email, api_key)
+    else:
+        email = auth.email
+        api_key = auth.api_key
     data = get_user_data()
-    auth_data = get_auth_data()
-    api_key = authenticate(auth_data)
     print(api_key)
-    if not api_key:
-        print("Invalid Login!")
-    return data
-    result = save_measurements(api_key, auth_data.get('email'), data)
-
-    if not result:
+    print(email)
+    result = srv.save_measurements(api_key, email, data)
+    if result:
         print("Done!")
+    else:
+        print("Could saved results")
 
 
 def get_auth_data() -> dict:
@@ -30,20 +47,6 @@ def get_auth_data() -> dict:
     }
 
 
-def authenticate(data: dict) -> Optional[str]:
-    email = data.get('email')
-    password = data.get('password')
-    body = {
-        'email': email,
-        'password': password,
-    }
-    url = base_url + 'authorise'
-    resp = requests.post(url, json=body)
-    if not resp.status_code == 200:
-        return None
-    return resp.json().get('api_key')
-
-
 def get_user_data() -> dict:
     print("Please enter a measurement: ")
     rate = input('resting heartrate: ')
@@ -54,21 +57,6 @@ def get_user_data() -> dict:
         'rate': rate,
         'recorded': recorded
     }
-
-
-def save_measurements(api_key: str, email: str, data: dict):
-    url = base_url + 'add_measurement'
-    auth = {
-        "email": email,
-        "api_key": api_key,
-        "weight": 178,
-        "rate": 29,
-        "recorded": "2022-10-11"
-    }
-    data.update(auth)
-    resp = requests.post(url, json=data)
-    print('server response', resp.text)
-    return resp.status_code == 200
 
 
 if __name__ == '__main__':
